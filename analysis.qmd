@@ -36,3 +36,95 @@ movies |>
   theme_minimal()
 ```
 
+```{r}
+movies_gap <- movies_clean |>
+  # Drop rows where either score is 0
+  filter(tomatoMeter != 0, audienceScore != 0) |>
+  # Positive gap means critics rated the film higher than audiences
+  mutate(gap = tomatoMeter - audienceScore)
+
+movies_summary <- movies_gap |>
+  # Mean gap and row count for each genre
+  summarize(
+    mean_gap = mean(gap),
+    n = n(),
+    .by = genre
+  ) |>
+  # Keep only genres with at least 100 films
+  filter(n >= 100) |>
+  arrange(mean_gap)
+
+# Show all remaining genres instead of truncating after 10 rows
+print(movies_summary, n = Inf)
+```
+
+```{r}
+movies_summary |>
+  # Order genres from most audience-favored (negative) to most critic-favored (positive)
+  ggplot(aes(x = mean_gap, y = fct_reorder(genre, mean_gap))) +
+  geom_col(fill = "steelblue") +
+  # Mark zero where critic and audience averages are equal
+  geom_vline(xintercept = 0, linetype = "dashed") +
+  labs(
+    title = "Critics Favor Horror and Documentaries; Audiences Favor Action",
+    subtitle = "Average Tomatometer minus Audience Score for genres with at least 100 films",
+    x = "Average Score Gap (Critic - Audience)",
+    y = "Genre"
+  ) +
+  theme_minimal()
+```
+
+```{r}
+spiderman <- movies |>
+  filter(
+    title %in% c(
+      "Spider-Man",
+      "Spider-Man 2",
+      "Spider-Man 3",
+      "The Amazing Spider-Man",
+      "The Amazing Spider-Man 2",
+      "Spider-Man: Homecoming",
+      "Spider-Man: Far From Home",
+      "Spider-Man: No Way Home"
+    )
+  ) |>
+  # Assign lead actor based on the title pattern
+  mutate(
+    actor = case_when(
+      title %in% c("Spider-Man", "Spider-Man 2", "Spider-Man 3") ~ "Tobey Maguire",
+      str_detect(title, "Amazing") ~ "Andrew Garfield",
+      str_detect(title, ":") ~ "Tom Holland"
+    )
+  ) |>
+  arrange(releaseDateTheaters)
+
+spiderman |>
+  # Lock film titles in release order and reshape scores for two lines
+  mutate(title = fct_inorder(title)) |>
+  pivot_longer(
+    cols = c(tomatoMeter, audienceScore),
+    names_to = "score_type",
+    values_to = "score"
+  ) |>
+  ggplot(aes(x = title, y = score, color = score_type, group = score_type)) +
+  geom_line(linewidth = 1) +
+  geom_point(size = 2.5) +
+  scale_color_manual(
+    values = c(tomatoMeter = "firebrick", audienceScore = "steelblue"),
+    labels = c(tomatoMeter = "Tomatometer (Critics)", audienceScore = "Audience Score")
+  ) +
+  labs(
+    title = "Critics Led Early Spider-Man Films Before Audiences Caught Up",
+    subtitle = "Rotten Tomatoes critic and audience scores in release order (2002–2021)",
+    x = NULL,
+    y = "Score (0–100)",
+    color = NULL
+  ) +
+  theme_minimal() +
+  # Angle film titles so all eight labels fit without overlapping
+  theme(
+    axis.text.x = element_text(angle = 30, hjust = 1),
+    legend.position = "top"
+  )
+```
+
